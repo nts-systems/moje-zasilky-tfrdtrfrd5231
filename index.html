@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sledování zásilky</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #0056b3; --accent: #10b981; --error: #ef4444; }
+        body { font-family: 'Poppins', sans-serif; background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%); margin: 0; min-height: 100vh; display: flex; justify-content: center; padding: 15px; }
+        .app-card { width: 100%; max-width: 450px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 25px; overflow: hidden; align-self: flex-start; }
+        h1 { font-size: 1.4rem; color: #102a43; }
+        .hr { height: 2px; background: #bcccdc; margin: 15px 0; }
+        .screen { display: none; animation: slideIn 0.4s ease-out; }
+        .screen.active { display: block; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        
+        .pkg-btn { background: white; border: 2px solid #e1e8ed; border-radius: 15px; padding: 20px; width: 100%; text-align: left; cursor: pointer; transition: 0.2s; }
+        .pkg-btn:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .status-ready { color: var(--accent); font-weight: 600; font-size: 0.9rem; }
+        
+        .btn-blue { background: var(--primary); color: white; border: none; width: 100%; padding: 15px; border-radius: 12px; font-weight: 700; margin-top: 10px; cursor: pointer; }
+        .btn-gray { background: #bcccdc; color: #334e68; border: none; width: 100%; padding: 15px; border-radius: 12px; font-weight: 700; margin-top: 10px; cursor: pointer; }
+        
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .big-pin { font-size: 2.2rem; display: block; margin: 10px 0; color: #102a43; }
+        .link-problem { color: var(--primary); text-decoration: underline; display: block; margin-top: 20px; text-align: center; cursor: pointer; }
+        
+        .search-btn { background: white; border: 1px solid #d9e2ec; padding: 20px; border-radius: 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 15px; cursor: pointer; width: 100%; text-align: left; }
+        .search-btn i { font-size: 1.5rem; }
+        
+        .status-list { list-style: none; padding: 0; }
+	.status-item { 
+            padding: 12px 0; 
+            border-bottom: 1px solid #e1e8ed; 
+            font-size: 0.9rem; 
+            color: #1e293b; /* Tmavá barva textu */
+            display: flex; 
+            align-items: center; 
+            gap: 10px;
+            opacity: 0; 
+            animation: fadeIn 0.5s ease-out forwards; 
+        }
+        .check-container { width: 24px; font-weight: bold; color: var(--accent); }
+        .check { color: var(--accent); margin-right: 8px; }
+
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 100; padding: 20px; }
+        .modal { background: white; padding: 25px; border-radius: 20px; text-align: center; }
+
+        .data-flow { display: flex; justify-content: space-around; align-items: center; margin: 30px 0; }
+        .flow-anim { height: 4px; background: #e1e8ed; flex-grow: 1; margin: 0 10px; position: relative; overflow: hidden; }
+        .flow-anim::after { content: ''; position: absolute; width: 40%; height: 100%; background: var(--primary); animation: flow 1.5s infinite linear; }
+        @keyframes flow { from { left: -40%; } to { left: 100%; } }
+    </style>
+</head>
+<body>
+
+<div id="locked" style="display:none; text-align:center; padding: 50px;">
+    <h1>Ups... V NTS jste správně, ale zadaný odkaz již není platný. Platnost vypršela. Obraťte se na podpora.nts@gmail.com.</h1>
+</div>
+
+<div class="app-card" id="app_content" style="display:none;">
+    <div id="scr_home" class="screen active">
+        <h1 id="home_title">Dočasný přístup do admin lot rozhraní zásilek (do: XX)</h1>
+        <div class="hr"></div>
+        <h2>Aktuální aktivní zásilky</h2>
+        <button class="pkg-btn" onclick="goToDetail()">
+            <strong>Disk Hirens Boot Windows boot image</strong><br>
+            <span class="status-ready">✓ Připravené na vyzvednutí</span>
+        </button>
+    </div>
+
+    <div id="scr_detail" class="screen">
+        <div id="loading_detail" class="loader" style="display:none;"></div>
+        <div id="content_detail">
+            <h1>Balík: Disk Hirens Boot Windows boot image</h1>
+            <span class="status-ready">✓ Připravené na vyzvednutí</span>
+            <div class="hr"></div>
+            <p>Zpráva pro vyzvednutí automaticky odeslána (37 sekund po doručení)</p>
+            <div class="hr"></div>
+            <p>Kurýr: <b>PPL</b></p>
+            <p>Výdejní místo: <b>MO-Potraviny Lenka (Čertoryje 210, 78375)</b></p>
+            <div class="hr"></div>
+            <p>Objednáno: <b>Objednávka číslo 26915472528188 z bscom.cz</b></p>
+            <button class="btn-gray" onclick="showScreen('scr_home')">← Zpět</button>
+            <button class="btn-blue" onclick="goToVyzvednout()">Vyzvednout zásilku nyní</button>
+        </div>
+    </div>
+
+    <div id="scr_vyzvednout" class="screen">
+        <div id="loading_vyzv" class="loader" style="display:none;"></div>
+        <div id="content_vyzv">
+            <h1>Vyzvednout zásilku</h1>
+            <p>Kde: <b>MO-Potraviny Lenka</b></p>
+            <p>Číslo zásilky: <b id="disp_bad_cislo">X</b></p>
+            <p>PIN pro vydání: <b id="disp_bad_pin" class="big-pin">Y</b></p>
+            <p>Jméno na zásilce: <b>Jan Oříšek</b></p>
+            <p>Telefonní číslo: <b>739725225</b></p>
+            <span class="link-problem" onclick="showScreen('scr_search_choice')">Zásilka nelze vyzvednout / nesprávné údaje</span>
+        </div>
+    </div>
+
+    <div id="scr_search_choice" class="screen">
+        <h1>Najít správnou zásilku</h1>
+        <p>Zvolit si jednu z možností:</p>
+        <button class="search-btn" onclick="showScreen('scr_auto_search')">
+            <span>🏠</span>
+            <div>
+                <strong>Najít automaticky</strong><br>
+                <small>Systém NTS se spojí se systémem výdejního místa, aby zjistil, co se stalo a najde zásilku (automatizovaný proces)...</small>
+            </div>
+        </button>
+        <button class="search-btn" onclick="showManualError()">
+            <span>📦</span>
+            <div>
+                <strong>Skenovat všechny balíky</strong><br>
+                <small>Bude potřeba do systému NTS naskenovat všechny zásilky na výdejním místě (potřeba schválení výdejního místa!) a systém najde tu správnou. Potřeba kvalitních fotek štítků balíků.</small>
+            </div>
+        </button>
+    </div>
+
+    <div id="scr_auto_search" class="screen">
+        <h1>Hledání zásilky automaticky</h1>
+        <p>Systém vyhledá zásilku na daném výdejním místě.</p>
+        <p><small><b>Důležité:</b> Je potřeba být u výdejního místa nebo pokud možno v prostorách výdejního místa, tedy co nejblíže IT zařízení výdejního místa! V opačném případě nebude přenos dat úspěšný a zásilka se nemusí najít!</small></p>
+        <div id="shop_check_msg"></div>
+        <button id="btn_start_search" class="btn-blue" style="display:none;" onclick="startHledani()">Hledat zásilku automaticky →</button>
+    </div>
+
+    <div id="scr_progress" class="screen">
+        <h1>Systém hledá zásilku...</h1>
+        <p><small>Nevypínat zařízení (pravidelně se dotknout displeje proti vypnutí). Zabere to jen chvíli.</small></p>
+        <div class="hr"></div>
+        <div id="progress_list" class="status-list"></div>
+    </div>
+
+    <div id="scr_sim" class="screen">
+        <div class="data-flow">
+            <div style="text-align:center;">
+                <div style="font-size:3rem;">🏪</div>
+                <b>PPL</b>
+            </div>
+            <div class="flow-anim"></div>
+            <div style="text-align:center;">
+                <div style="font-size:3rem;">☁️</div>
+                <b>NTS</b>
+            </div>
+        </div>
+        <p style="text-align:center;">Probíhá výměna dat...</p>
+    </div>
+
+    <div id="scr_decipher" class="screen">
+        <h1>Deciphering...</h1>
+        <p>Tento systém používá pro zvýšení zabezpečení asynchronní šifrování. Stránka již obdržela data, ale zatím se čeká na předání asynchronního dešifrovacího klíče ATH...</p>
+    </div>
+
+    <div id="scr_final" class="screen">
+        <h1>Zásilka nalezena!</h1>
+        <div style="font-size:3rem; text-align:center; color: var(--accent);">✓</div>
+        <p>Správná zásilka byla nalezena, ale bohužel systém doposud nepodporuje zpětné zasílání dat. Údaje o správné zásilce jsou připraveny, ale není možné zaslat nový odkaz nebo je zobrazit jiným způsobem.</p>
+        <p style="color: var(--primary); font-size: 1.1rem; font-weight:600;">Zavoláme Vám. Stránka zjistila číslo +420 732 200 133. Na tohle číslo zavolá naše virtuální asistentka a předá Vám veškeré potřebné údaje pro převzetí zásilky. Stačí dát hovor nahlas, aby mohla obsluha výdejního místa vydat zásilku. Kód pro vydání během hovoru uslyšíte opakovaně.</p>
+        <button id="btn_call" class="btn-blue" onclick="requestCall()">Zavolejte mi nyní</button>
+        <p id="call_status" style="text-align:center; font-weight:700; color: var(--primary); display:none;"></p>
+    </div>
+</div>
+
+<div id="overlay_error" class="overlay">
+    <div class="modal">
+        <div style="font-size:3rem; color: var(--error);">⚠️</div>
+        <p>Ups... Systém NTS se nedokázal spojit s kamerou tohoto telefonu. Na seznamu povolených zařízení je: Samsung Galaxy A14 uživatele SN Adam. Přidat na seznam i tohle zařízení nebo použít automatické hledání zásilky!</p>
+        <button class="btn-blue" onclick="document.getElementById('overlay_error').style.display='none'">Rozumím</button>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyArqhSNnu855zKrCzNYj4ATvaJowm8oV_g",
+        authDomain: "moje-zasilka-ppl-vyzvednuti.firebaseapp.com",
+        databaseURL: "https://moje-zasilka-ppl-vyzvednuti-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "moje-zasilka-ppl-vyzvednuti",
+        storageBucket: "moje-zasilka-ppl-vyzvednuti.firebasestorage.app",
+        messagingSenderId: "627977773562",
+        appId: "1:627977773562:web:35117455ea2a38bcfbc443"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Security Check
+    onValue(ref(db), (snapshot) => {
+        const data = snapshot.val();
+        if (!data || data.aktivace !== 1) {
+            document.getElementById('locked').style.display = 'block';
+            document.getElementById('app_content').style.display = 'none';
+        } else {
+            document.getElementById('locked').style.display = 'none';
+            document.getElementById('app_content').style.display = 'block';
+            document.getElementById('home_title').innerText = `Dočasný přístup do admin lot rozhraní zásilek (do: ${data.deaktivace_termin || '??'})`;
+            
+            // Sync bad data
+            if(data.chybne_udaje) {
+                document.getElementById('disp_bad_cislo').innerText = data.chybne_udaje.cislo;
+                document.getElementById('disp_bad_pin').innerText = data.chybne_udaje.pin;
+            }
+
+            // Sync shop status
+            const msg = document.getElementById('shop_check_msg');
+            const btn = document.getElementById('btn_start_search');
+            if (data.obchod === 1) {
+                msg.innerHTML = '<p style="color:green; font-weight:700;">Systém NTS se dokáže spojit s výdejním místem. Je možné začít hledat.</p>';
+                btn.style.display = 'block';
+            } else {
+                msg.innerHTML = '<p style="color:red; font-weight:700;">Systém NTS se nyní nedokáže spojit s PPL ParcelShop MO-Potraviny Lenka! Je potřeba se přiblížit více!</p>';
+                btn.style.display = 'none';
+            }
+        }
+    });
+
+    window.showScreen = (id) => {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    };
+
+    window.goToDetail = () => {
+        showScreen('scr_detail');
+        const cont = document.getElementById('content_detail');
+        const load = document.getElementById('loading_detail');
+        cont.style.display = 'none'; load.style.display = 'block';
+        setTimeout(() => { cont.style.display = 'block'; load.style.display = 'none'; }, 1500);
+    };
+
+    window.goToVyzvednout = () => {
+        showScreen('scr_vyzvednout');
+        const cont = document.getElementById('content_vyzv');
+        const load = document.getElementById('loading_vyzv');
+        cont.style.display = 'none'; load.style.display = 'block';
+        setTimeout(() => { cont.style.display = 'block'; load.style.display = 'none'; }, 1500);
+    };
+
+    window.showManualError = () => {
+        document.getElementById('overlay_error').style.display = 'flex';
+    };
+
+    const statuses = [
+        ["Dotazování výdejního místa", 12],
+        ["Získávání informací o zásilkách", 17],
+        ["Příprava uzavřeného komunikačního kanálu", 5],
+        ["Žádost o připojení k serveru NTS-Zásikovačka odeslána", 3],
+        ["Žádost o připojení k serveru NTS-Zásikovačka se schvaluje", 12],
+        ["Výměna hashovacích tokenů", 13],
+        ["Údaje se před odesláním šifrují...", 9],
+        ["Údaje se připravují k importu na server", 12],
+        ["Volání vzdálené procedury", 12],
+        ["Otevírání vzdáleného připojení online", 6],
+        ["Otevřeno připojení: port 62082", 1],
+        ["Odesílání dat na server", 19],
+        ["Server obdržel balíček šifrovaných dat", 10],
+        ["Probíhá dešifrace dat na serveru", 19],
+        ["Výměna tokenů.", 12],
+["Server zpracovává údaje a hledá zásilku.", 5]
+    ];
+
+    window.startHledani = async () => {
+        console.log("Start vyhledávání spuštěn...");
+        
+        // Nastavení stavu v databázi pro admina
+        try {
+            update(ref(db), { stav: 'probíhá' });
+        } catch (e) {
+            console.error("Chyba Firebase:", e);
+        }
+
+        showScreen('scr_progress');
+        const list = document.getElementById('progress_list');
+        list.innerHTML = ''; // Vyčištění
+
+        for (const [txt, time] of statuses) {
+            const item = document.createElement('div');
+            // Explicitně nastavíme styl v JS, aby nás CSS neblokovalo
+            item.style.padding = "12px 0";
+            item.style.borderBottom = "1px solid #e1e8ed";
+            item.style.display = "flex";
+            item.style.alignItems = "center";
+            item.style.color = "#1e293b";
+            item.style.opacity = "1"; // Zajistíme viditelnost
+            
+            item.innerHTML = `<span class="check" style="color:#10b981; font-weight:bold; width:25px; opacity:0;">✓</span><span>${txt}</span>`;
+            list.appendChild(item);
+
+            // Čekání
+            await new Promise(r => setTimeout(r, time * 1000));
+
+            // Zobrazení fajfky
+            const check = item.querySelector('.check');
+            if (check) check.style.opacity = '1';
+            item.style.fontWeight = '600';
+            
+            // Posun obrazovky
+            item.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+
+        console.log("Seznam dokončen, přepínám na simulaci...");
+        showScreen('scr_sim');
+        await new Promise(r => setTimeout(r, 82000)); 
+        
+        showScreen('scr_decipher');
+        await new Promise(r => setTimeout(r, 13000));
+        
+        showScreen('scr_final');
+    };
+
+    window.requestCall = () => {
+        update(ref(db), { stav: 'VOLAT' });
+        const btn = document.getElementById('btn_call');
+        const stat = document.getElementById('call_status');
+        
+        btn.style.display = 'none';
+        stat.style.display = 'block';
+        stat.innerText = 'Zajišťuje se hovor';
+        
+        setTimeout(() => {
+            stat.innerText = 'Voláme Vám, přijměte hovor';
+        }, 3000);
+    };
+</script>
+</body>
+</html>
