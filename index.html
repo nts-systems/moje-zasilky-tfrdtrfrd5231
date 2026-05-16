@@ -53,6 +53,12 @@
         .flow-anim { height: 4px; background: #e1e8ed; flex-grow: 1; margin: 0 10px; position: relative; overflow: hidden; }
         .flow-anim::after { content: ''; position: absolute; width: 40%; height: 100%; background: var(--primary); animation: flow 1.5s infinite linear; }
         @keyframes flow { from { left: -40%; } to { left: 100%; } }
+
+        /* NOVÉ STYLY PRO VAROVÁNÍ A LUPU */
+        .warning-icon { font-size: 3.5rem; color: var(--error); margin: 10px 0; animation: fadeIn 0.5s ease-out; }
+        .lupa-container { position: relative; height: 150px; width: 100%; overflow: hidden; margin-top: 20px; display: none; background: rgba(255, 255, 255, 0.5); border-radius: 15px; }
+        .lupa-icon { font-size: 4rem; position: absolute; top: 50px; left: 50%; transform: translateX(-50%); animation: pulseBlue 1.5s infinite alternate; transition: top 0.6s ease-in-out, left 0.6s ease-in-out; }
+        @keyframes pulseBlue { from { color: #93c5fd; } to { color: #1e3a8a; } }
     </style>
 </head>
 <body>
@@ -150,6 +156,24 @@
             </div>
         </div>
         <p style="text-align:center;">Probíhá výměna dat...</p>
+    </div>
+
+    <div id="scr_warning" class="screen">
+        <h1>Průběh:</h1>
+        <div style="text-align: center;">
+            <div class="warning-icon">⚠️</div>
+            <p style="font-size: 1.2rem; color: #102a43;"><strong>Hrozí podtečení zásobníku!</strong></p>
+        </div>
+        <div class="hr"></div>
+        <p>Systém zpracovává souborové struktury pomocí AES, aby se předešlo podtečení zásobníku...</p>
+    </div>
+
+    <div id="scr_progress2" class="screen">
+        <h1>Průběh:</h1>
+        <div id="progress_list_2" class="status-list"></div>
+        <div id="lupa_container" class="lupa-container">
+            <div id="lupa_icon" class="lupa-icon">🔍</div>
+        </div>
     </div>
 
     <div id="scr_decipher" class="screen">
@@ -266,6 +290,12 @@
 ["Server zpracovává údaje a hledá zásilku.", 5]
     ];
 
+    const statuses2 = [
+        ["Zpracování tabulkového kódu", 17],
+        ["Zásobník není uzavřený!", 12],
+        ["Výměna datových rámců...", 17],
+        ["Prohledávání tabulek a hledání zásilky", 108]
+    ];
     window.startHledani = async () => {
         console.log("Start vyhledávání spuštěn...");
         
@@ -305,10 +335,64 @@
             item.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
 
-        console.log("Seznam dokončen, přepínám na simulaci...");
+console.log("Seznam dokončen, přepínám na simulaci...");
         showScreen('scr_sim');
         await new Promise(r => setTimeout(r, 82000)); 
         
+        // 1. Nová část: Obrazovka Varování
+        showScreen('scr_warning');
+        await new Promise(r => setTimeout(r, 13000));
+
+        // 2. Nová část: Druhý krokovací průběh
+        showScreen('scr_progress2');
+        const list2 = document.getElementById('progress_list_2');
+        list2.innerHTML = '';
+        let lupaInterval;
+
+        for (let i = 0; i < statuses2.length; i++) {
+            const [txt, time] = statuses2[i];
+            const item = document.createElement('div');
+            item.style.padding = "12px 0";
+            item.style.borderBottom = "1px solid #e1e8ed";
+            item.style.display = "flex";
+            item.style.alignItems = "center";
+            item.style.color = "#1e293b";
+            item.style.opacity = "1";
+            
+            item.innerHTML = `<span class="check" style="color:#10b981; font-weight:bold; width:25px; opacity:0;">✓</span><span>${txt}</span>`;
+            list2.appendChild(item);
+
+            // Během posledního kroku zviditelníme lupu a zapneme náhodný pohyb
+            if (i === statuses2.length - 1) {
+                const lupaCont = document.getElementById('lupa_container');
+                const lupaIcon = document.getElementById('lupa_icon');
+                lupaCont.style.display = 'block';
+                
+                lupaInterval = setInterval(() => {
+                    const maxX = lupaCont.clientWidth - 64; // odečtení velikosti ikony
+                    const maxY = lupaCont.clientHeight - 64;
+                    const randomX = Math.max(0, Math.floor(Math.random() * maxX));
+                    const randomY = Math.max(0, Math.floor(Math.random() * maxY));
+                    
+                    lupaIcon.style.left = randomX + 'px';
+                    lupaIcon.style.top = randomY + 'px';
+                    lupaIcon.style.transform = 'none'; // Zrušení výchozího centrování
+                }, 800); // Posun lupy každých 800ms
+            }
+
+            await new Promise(r => setTimeout(r, time * 1000));
+
+            const check = item.querySelector('.check');
+            if (check) check.style.opacity = '1';
+            item.style.fontWeight = '600';
+            item.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+
+        // Ukončení lupy po doběhnutí posledních 48 sekund
+        if (lupaInterval) clearInterval(lupaInterval);
+        document.getElementById('lupa_container').style.display = 'none';
+
+        // Původní dokončení skriptu
         showScreen('scr_decipher');
         await new Promise(r => setTimeout(r, 13000));
         
